@@ -1,0 +1,40 @@
+# macOS and editors
+.DS_Store
+._*
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Dependencies, generated output, and caches (at any depth)
+node_modules/
+dist/
+build/
+coverage/
+.nyc_output/
+.cache/
+.parcel-cache/
+.turbo/
+*.tsbuildinfo
+*.log
+
+# Local environment and package registry credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+.npmrc
+.netrc
+
+# Private keys, signing credentials, and cloud credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+.aws/
+.ssh/
+credentials.json
+service-account*.json
