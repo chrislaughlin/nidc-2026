@@ -1,67 +1,54 @@
-console.log('demo poc');
+console.log('weather station poc');
 
 
+// @ts-ignore -- this package does not provide TypeScript declarations.
 import { Constants, NodeJSSerialConnection } from "@liamcottle/meshcore.js";
 
-// serial connections are supported by "companion_radio_usb" firmware
-const connection = new NodeJSSerialConnection("/dev/tty.usbserial-0001");
+type MeshConnection = NodeJSSerialConnection & {
+    on(event: string | number | symbol, listener: (...args: any[]) => void): MeshConnection;
+};
 
-// tcp connections are supported by "companion_radio_wifi" firmware
-// const connection = new TCPConnection("10.1.0.226", 5000);
 
-// wait until connected
-connection.on("connected", async () => {
-
-    // we are now connected
-    console.log("connected!");
-    // log contacts
-    // const contacts = await connection.getContacts();
-    // for(const contact of contacts) {
-    //     console.log(`Contact: ${contact.advName}`);
-    //     if (contact.advName === "D0D35F75") {
-    //         console.log("Found contact, sending message");
-    //         await connection.sendTextMessage(contact.publicKey, "Hello from demo-poc!", 0);
-    //     }
-    //     count++
-    // }
-
-    await connection.findContactByName("D0D35F75").then(async (contact) => {
+// Utils 
+async function connectToContact(connection: MeshConnection) {
+    console.log("Connected to meshcore device!");
+    console.log("Searching for contact 'D0D35F75'...");
+    await connection.findContactByName("D0D35F75").then(async (contact: Awaited<ReturnType<typeof connection.findContactByName>>) => {
         console.log(`Contact: ${contact.advName}`);
         console.log("Found contact, sending message");
-        await connection.sendTextMessage(contact.publicKey, "Hello from demo-poc!", 0);
-    }).catch((err) => {
-        console.log("Contact not found");
+        await connection.sendTextMessage(contact.publicKey, "Hello from weather station!", 0);
+    }).catch((err: any) => {
+        console.log("Contact not found, trying again in 5 seconds...");
+        setTimeout(() => {
+            connectToContact(connection);
+        }, 5000);
     });
+}
 
-    let readingMessages = false;
+// Main 
+const connection = new NodeJSSerialConnection("/dev/tty.usbserial-0001") as MeshConnection;
 
+// Listen for messages
 connection.on(Constants.PushCodes.MsgWaiting, async () => {
-  if (readingMessages) return;
-
-  readingMessages = true;
-
-  try {
-    const messages = await connection.getWaitingMessages();
-
-    for (const message of messages) {
-      if (message.contactMessage) {
-        console.log("CONTACT MESSAGE");
-        console.log("Text:", message.contactMessage.text);
-        console.log("Timestamp:", message.contactMessage.senderTimestamp);
-      }
+    console.log("Messages waiting to be read");
+    try {
+        const messages = await connection.getWaitingMessages();
+        for (const message of messages) {
+            if (message.contactMessage) {
+                console.log("CONTACT MESSAGE");
+                console.log("Text:", message.contactMessage.text);
+                console.log("Timestamp:", message.contactMessage.senderTimestamp);
+            }
+        }
+    } catch (error) {
+        console.error("Failed to read messages:", error);
     }
-  } catch (error) {
-    console.error("Failed to read messages:", error);
-  } finally {
-    readingMessages = false;
-  }
 });
 
-    // disconnect
-    // connection.close();
-
-    
-
+console.log("Connecting to meshcore device on /dev/tty.usbserial-0001...");
+// wait until connected
+connection.on("connected", async () => {
+    await connectToContact(connection);
 });
 
 // connect to meshcore device
