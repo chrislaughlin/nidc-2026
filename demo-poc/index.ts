@@ -45,6 +45,19 @@ const connection = new NodeJSSerialConnection("/dev/tty.usbserial-0001") as Mesh
 
 console.log("Connecting to meshcore device on /dev/tty.usbserial-0001...");
 
+async function replyToMessage(senderPubKeyPrefix: Uint8Array, text: string) {
+    // don't reply to our own acknowledgements, otherwise two radios would loop forever
+    if (text.startsWith("ACK:")) return;
+
+    const reply = `ACK: ${text}`;
+    try {
+        await connection.sendTextMessage(senderPubKeyPrefix, reply, 0);
+        console.log(`Replied to 0x${bytesToHex(senderPubKeyPrefix)}: ${reply}`);
+    } catch (error) {
+        console.error("Failed to send reply:", error);
+    }
+}
+
 async function readWaitingMessages() {
     try {
         const messages = await connection.getWaitingMessages();
@@ -53,6 +66,7 @@ async function readWaitingMessages() {
                 console.log("CONTACT MESSAGE");
                 console.log("Text:", message.contactMessage.text);
                 console.log("Timestamp:", message.contactMessage.senderTimestamp);
+                await replyToMessage(message.contactMessage.pubKeyPrefix, message.contactMessage.text);
             }
         }
     } catch (error) {
