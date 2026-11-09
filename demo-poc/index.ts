@@ -3,6 +3,7 @@ console.log('weather station poc');
 
 // @ts-ignore -- this package does not provide TypeScript declarations.
 import { Constants, NodeJSSerialConnection } from "@liamcottle/meshcore.js";
+import { weatherReply } from "./weather.ts";
 
 type MeshConnection = NodeJSSerialConnection & {
     on(event: string | number | symbol, listener: (...args: any[]) => void): MeshConnection;
@@ -46,10 +47,8 @@ const connection = new NodeJSSerialConnection("/dev/tty.usbserial-0001") as Mesh
 console.log("Connecting to meshcore device on /dev/tty.usbserial-0001...");
 
 async function replyToMessage(senderPubKeyPrefix: Uint8Array, text: string) {
-    // don't reply to our own acknowledgements, otherwise two radios would loop forever
-    if (text.startsWith("ACK:")) return;
-
-    const reply = `ACK: ${text}`;
+    const reply = weatherReply(text);
+    if (reply === null) return;
     try {
         await connection.sendTextMessage(senderPubKeyPrefix, reply, 0);
         console.log(`Replied to 0x${bytesToHex(senderPubKeyPrefix)}: ${reply}`);
@@ -116,8 +115,20 @@ async function onConnected() {
     console.log(selfInfo);
     myKeyPrefix = selfInfo.publicKey[0];
 
-    // keep the radio's clock in sync
-    await connection.syncDeviceTime();
+    // keep the radio's clock in sync, but only move it forward: the firmware
+    // rejects setting a time that isn't newer than the current device clock
+    try {
+        const { epochSecs } = await connection.getDeviceTime();
+        const hostTime = Math.floor(Date.now() / 1000);
+        if (epochSecs < hostTime) {
+            await connection.syncDeviceTime();
+            console.log(`Device clock synced from ${epochSecs} to ${hostTime}.`);
+        } else {
+            console.log(`Device clock already up to date (${epochSecs}).`);
+        }
+    } catch (error) {
+        console.error("Failed to sync device time:", error);
+    }
 
     // this radio can only decrypt a DM if the sender is in its contact list with the right key
     const contacts = await connection.getContacts();
